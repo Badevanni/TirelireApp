@@ -491,6 +491,10 @@ input:focus-visible,button:focus-visible,select:focus-visible{outline:2px solid 
   <div class="modal">
     <div class="modal-head"><h3 id="jarTitle">Feed the jar</h3><button class="close-x" data-close>×</button></div>
     <p style="font-size:13px;color:var(--muted);margin-bottom:14px">This money stays in your real total — it's set aside on paper, not deducted.</p>
+    <div class="field hidden" id="jarCatField">
+      <label>Save toward</label>
+      <div class="cat-chips" id="jarCats"></div>
+    </div>
     <div class="field">
       <label>Amount</label>
       <div class="amount-input"><input type="number" id="jarAmount" inputmode="decimal" placeholder="0" step="0.01"><span class="eur">€</span></div>
@@ -693,8 +697,9 @@ const DAYS_S=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 const cat=id=>S.categories.find(c=>c.id===id);
 const total=()=>S.startBalance+S.transactions.reduce((s,t)=>s+(t.type==='in'?t.amount:-t.amount),0);
 const savedTotal=()=>S.wishlist.filter(w=>!w.purchased).reduce((s,w)=>s+w.saved,0)
-  +S.trips.reduce((s,t)=>s+t.saved,0);
+  +S.trips.reduce((s,t)=>s+tripSaved(t),0);
 const tripTotal=t=>t.items.reduce((s,i)=>s+i.amount,0);
+const tripSaved=t=>t.saved+t.items.reduce((s,i)=>s+(i.saved||0),0);
 const monthKey=d=>d.slice(0,7);
 function monthFlows(mk){
   let inn=0,out=0;
@@ -781,7 +786,7 @@ function renderSide(){
   const list=document.getElementById('savingsList');
   const items=[
     ...S.wishlist.filter(w=>!w.purchased&&w.saved>0).map(w=>({name:w.name,saved:w.saved})),
-    ...S.trips.filter(t=>t.saved>0).map(t=>({name:t.name+' (trip)',saved:t.saved}))
+    ...S.trips.filter(t=>tripSaved(t)>0).map(t=>({name:t.name+' (trip)',saved:tripSaved(t)}))
   ];
   if(!items.length){list.innerHTML='<div class="empty">Nothing set aside yet. Feed a jar in the wishlist or a trip.</div>';}
   else list.innerHTML=items.map(w=>`<div class="save-line"><span class="sname">${esc(w.name)}</span><span class="samt">−&nbsp;${eur(w.saved)}</span></div>`).join('')
@@ -807,7 +812,7 @@ function renderSim(){
   const t=S.trips.find(x=>x.id===simTripId), cost=tripTotal(t);
   const after=total()-cost;
   res.innerHTML=`<div class="after-total" style="color:${after<S.minKeep?'var(--out)':'var(--text)'}">${eur(after)}</div>
-    <div class="after-sub">${eur(total())} − ${eur(cost)} (${esc(t.name)})${t.saved>0?` · its jar already holds ${eur(Math.min(t.saved,cost))} of it`:''}</div>`;
+    <div class="after-sub">${eur(total())} − ${eur(cost)} (${esc(t.name)})${tripSaved(t)>0?` · its jar already holds ${eur(Math.min(tripSaved(t),cost))} of it`:''}</div>`;
 }
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
@@ -1251,18 +1256,45 @@ cardPhotoInput.addEventListener('change',async e=>{
   if(w){w.photo=data;saveState();renderWishlist();toast('Photo added');}
 });
 // jar (shared by wishlist items and trips)
-let jarTarget=null;
-function openJar(id,kind){
-  jarTarget=kind==='trip'?S.trips.find(t=>t.id===id):S.wishlist.find(w=>w.id===id);
-  document.getElementById('jarTitle').textContent=`Jar — ${jarTarget.name}`;
-  document.getElementById('jarAmount').value='';
-  const target=kind==='trip'?tripTotal(jarTarget):jarTarget.price;
-  const remaining=Math.max(0,target-jarTarget.saved);
+let jarTarget=null, jarKind=null, jarCatSel=null;
+function jarRemaining(){
+  if(jarKind!=='trip') return Math.max(0,jarTarget.price-jarTarget.saved);
+  if(jarCatSel){
+    const it=jarTarget.items.find(i=>i.id===jarCatSel);
+    return Math.max(0,it.amount-(it.saved||0));
+  }
+  return Math.max(0,tripTotal(jarTarget)-tripSaved(jarTarget));
+}
+function renderJarQuickset(){
+  const remaining=jarRemaining();
   const qs=document.getElementById('jarQuickset');
   const opts=[20,50,100,200].filter(v=>v<=remaining||remaining===0);
   qs.innerHTML=opts.map(v=>`<button data-v="${v}">${v}&nbsp;€</button>`).join('')
     +(remaining>0?`<button data-v="${remaining}">Rest (${eurShort(remaining)})</button>`:'');
   qs.querySelectorAll('button').forEach(b=>b.onclick=()=>{document.getElementById('jarAmount').value=b.dataset.v;});
+}
+function renderJarCats(){
+  const field=document.getElementById('jarCatField');
+  if(jarKind!=='trip'||!jarTarget.items.length){field.classList.add('hidden');return;}
+  field.classList.remove('hidden');
+  const box=document.getElementById('jarCats');box.innerHTML='';
+  const mk=(label,id,savedTxt)=>{
+    const b=document.createElement('button');
+    b.className='cat-chip'+(jarCatSel===id?' selected':'');
+    if(jarCatSel===id){b.style.borderColor='var(--ink)';b.style.background='var(--primary-soft)';}
+    b.innerHTML=esc(label)+(savedTxt?` <span style="color:var(--faint);font-weight:500">${savedTxt}</span>`:'');
+    b.onclick=()=>{jarCatSel=id;renderJarCats();renderJarQuickset();};
+    box.appendChild(b);
+  };
+  mk('General',null,jarTarget.saved>0?eurShort(jarTarget.saved):'');
+  jarTarget.items.forEach(i=>mk(i.name,i.id,(i.saved||0)>0?eurShort(i.saved)+' / '+eurShort(i.amount):eurShort(i.amount)));
+}
+function openJar(id,kind){
+  jarKind=kind||null;jarCatSel=null;
+  jarTarget=kind==='trip'?S.trips.find(t=>t.id===id):S.wishlist.find(w=>w.id===id);
+  document.getElementById('jarTitle').textContent=`Jar — ${jarTarget.name}`;
+  document.getElementById('jarAmount').value='';
+  renderJarCats();renderJarQuickset();
   openModal('ovJar');
 }
 function refreshJarViews(){
@@ -1270,16 +1302,22 @@ function refreshJarViews(){
   if(!document.getElementById('tab-holidays').classList.contains('hidden'))renderTrips();
   renderSide();
 }
+function jarPocket(){
+  if(jarKind==='trip'&&jarCatSel)return jarTarget.items.find(i=>i.id===jarCatSel);
+  return jarTarget;
+}
 document.getElementById('jarAdd').onclick=()=>{
   const v=parseFloat(document.getElementById('jarAmount').value);
   if(!(v>0)){toast('Enter an amount');return;}
-  jarTarget.saved+=v;saveState();closeModal('ovJar');refreshJarViews();
-  toast(`+${eur(v)} in the jar`);
+  const p=jarPocket();p.saved=(p.saved||0)+v;
+  saveState();closeModal('ovJar');refreshJarViews();
+  toast(`+${eur(v)} in the jar${jarKind==='trip'&&jarCatSel?' — '+jarPocket().name:''}`);
 };
 document.getElementById('jarRemove').onclick=()=>{
   const v=parseFloat(document.getElementById('jarAmount').value);
   if(!(v>0)){toast('Enter an amount');return;}
-  jarTarget.saved=Math.max(0,jarTarget.saved-v);saveState();closeModal('ovJar');refreshJarViews();
+  const p=jarPocket();p.saved=Math.max(0,(p.saved||0)-v);
+  saveState();closeModal('ovJar');refreshJarViews();
   toast(`−${eur(v)} from the jar`);
 };
 // purchase
@@ -1319,13 +1357,13 @@ function renderTrips(){
     return;
   }
   grid.innerHTML=S.trips.map(t=>{
-    const cost=tripTotal(t);
-    const pct=cost>0?Math.min(1,t.saved/cost):0;
+    const cost=tripTotal(t), tsaved=tripSaved(t);
+    const pct=cost>0?Math.min(1,tsaved/cost):0;
     const jarColor=pct>=1?'#2E8B5F':pct>=.6?'#7A9A2E':pct>=.3?'#B8821A':'#6C55E0';
     const lines=t.items.map(i=>
       `<div class="save-line"><span class="sname">${esc(i.name)}</span>
         <span style="display:flex;align-items:center;gap:8px">
-          <span class="samt" style="color:var(--text)">${eur(i.amount)}</span>
+          <span class="samt" style="color:var(--text)">${(i.saved||0)>0?`<span style="color:var(--in)">${eurShort(i.saved)}</span> / `:''}${eur(i.amount)}</span>
           <button class="tx-del" data-rmcost="${t.id}|${i.id}" aria-label="Remove" style="opacity:.6">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:14px;height:14px"><path d="M18 6L6 18M6 6l12 12"/></svg>
           </button>
@@ -1336,7 +1374,7 @@ function renderTrips(){
         <div class="wish-body">
           <div class="wish-name">${esc(t.name)}</div>
           <div class="wish-price">Trip total: ${eur(cost)}</div>
-          <div class="wish-saved"><b>${eur(t.saved)}</b> saved for this</div>
+          <div class="wish-saved"><b>${eur(tsaved)}</b> saved for this${t.saved>0&&t.items.length?` <span style="color:var(--faint)">(incl. ${eurShort(t.saved)} general)</span>`:''}</div>
           ${lines?`<div style="margin:6px 0 10px">${lines}</div>`:'<div class="after-sub" style="margin:4px 0 10px">No costs planned yet.</div>'}
           <div class="wish-actions">
             <button class="btn btn-primary" data-tjar="${t.id}">Feed the jar</button>
