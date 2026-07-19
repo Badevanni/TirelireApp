@@ -306,7 +306,7 @@ input:focus-visible,button:focus-visible,select:focus-visible{outline:2px solid 
 <div class="app">
 
   <div class="topbar">
-    <div class="brand">Tire<span>lire</span></div>
+    <div class="brand">Tire<span>lire</span> <span style="font-family:'Space Grotesk',sans-serif;font-style:normal;font-size:11px;font-weight:600;color:var(--faint);vertical-align:super">v5</span></div>
     <div class="topbar-actions">
       <button class="icon-btn" id="btnSettings" title="Settings" aria-label="Settings">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.63.28 1.06.9 1.1 1.6H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -407,7 +407,7 @@ input:focus-visible,button:focus-visible,select:focus-visible{outline:2px solid 
         </div>
         <div class="card">
           <div class="card-title">Trip simulation</div>
-          <div class="after-sub" style="margin-top:0">Tap a trip to see your total as if you paid it today. Just a simulation — nothing is deducted.</div>
+          <div class="after-sub" style="margin-top:0">Tap a trip to see your total as if you spent everything in its jar. Just a simulation — nothing is deducted.</div>
           <div class="cat-chips" id="simChips" style="margin-bottom:10px"></div>
           <div id="simResult"></div>
         </div>
@@ -492,8 +492,9 @@ input:focus-visible,button:focus-visible,select:focus-visible{outline:2px solid 
     <div class="modal-head"><h3 id="jarTitle">Feed the jar</h3><button class="close-x" data-close>×</button></div>
     <p style="font-size:13px;color:var(--muted);margin-bottom:14px">This money stays in your real total — it's set aside on paper, not deducted.</p>
     <div class="field hidden" id="jarCatField">
-      <label>Save toward</label>
-      <div class="cat-chips" id="jarCats"></div>
+      <label>Category (optional)</label>
+      <input type="text" id="jarCatInput" placeholder="e.g. Food, Flights, Hotel…" maxlength="40">
+      <div class="quickset" id="jarCatQuick"></div>
     </div>
     <div class="field">
       <label>Amount</label>
@@ -514,22 +515,6 @@ input:focus-visible,button:focus-visible,select:focus-visible{outline:2px solid 
     <div class="modal-actions">
       <button class="btn btn-ghost" data-close>Cancel</button>
       <button class="btn btn-primary" id="tripSave">Save</button>
-    </div>
-  </div>
-</div>
-
-<div class="overlay" id="ovTripCost">
-  <div class="modal">
-    <div class="modal-head"><h3 id="tripCostTitle">Add a cost</h3><button class="close-x" data-close>×</button></div>
-    <div class="field"><label>What for?</label><input type="text" id="tripCostName" placeholder="e.g. Flights, Food, Hotel…" maxlength="40">
-      <div class="quickset" id="tripCostQuick"></div>
-    </div>
-    <div class="field"><label>Amount</label>
-      <div class="amount-input"><input type="number" id="tripCostAmount" inputmode="decimal" placeholder="0" min="0" step="0.01"><span class="eur">€</span></div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-ghost" data-close>Cancel</button>
-      <button class="btn btn-primary" id="tripCostSave">Add</button>
     </div>
   </div>
 </div>
@@ -698,7 +683,6 @@ const cat=id=>S.categories.find(c=>c.id===id);
 const total=()=>S.startBalance+S.transactions.reduce((s,t)=>s+(t.type==='in'?t.amount:-t.amount),0);
 const savedTotal=()=>S.wishlist.filter(w=>!w.purchased).reduce((s,w)=>s+w.saved,0)
   +S.trips.reduce((s,t)=>s+tripSaved(t),0);
-const tripTotal=t=>t.items.reduce((s,i)=>s+i.amount,0);
 const tripSaved=t=>t.saved+t.items.reduce((s,i)=>s+(i.saved||0),0);
 const monthKey=d=>d.slice(0,7);
 function monthFlows(mk){
@@ -809,10 +793,10 @@ function renderSim(){
     chips.appendChild(b);
   });
   if(!simTripId){res.innerHTML='';return;}
-  const t=S.trips.find(x=>x.id===simTripId), cost=tripTotal(t);
+  const t=S.trips.find(x=>x.id===simTripId), cost=tripSaved(t);
   const after=total()-cost;
   res.innerHTML=`<div class="after-total" style="color:${after<S.minKeep?'var(--out)':'var(--text)'}">${eur(after)}</div>
-    <div class="after-sub">${eur(total())} − ${eur(cost)} (${esc(t.name)})${tripSaved(t)>0?` · its jar already holds ${eur(Math.min(tripSaved(t),cost))} of it`:''}</div>`;
+    <div class="after-sub">${eur(total())} − ${eur(cost)} saved for ${esc(t.name)}</div>`;
 }
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
@@ -1256,41 +1240,31 @@ cardPhotoInput.addEventListener('change',async e=>{
   if(w){w.photo=data;saveState();renderWishlist();toast('Photo added');}
 });
 // jar (shared by wishlist items and trips)
-let jarTarget=null, jarKind=null, jarCatSel=null;
-function jarRemaining(){
-  if(jarKind!=='trip') return Math.max(0,jarTarget.price-jarTarget.saved);
-  if(jarCatSel){
-    const it=jarTarget.items.find(i=>i.id===jarCatSel);
-    return Math.max(0,it.amount-(it.saved||0));
-  }
-  return Math.max(0,tripTotal(jarTarget)-tripSaved(jarTarget));
-}
+let jarTarget=null, jarKind=null;
 function renderJarQuickset(){
-  const remaining=jarRemaining();
   const qs=document.getElementById('jarQuickset');
-  const opts=[20,50,100,200].filter(v=>v<=remaining||remaining===0);
-  qs.innerHTML=opts.map(v=>`<button data-v="${v}">${v}&nbsp;€</button>`).join('')
-    +(remaining>0?`<button data-v="${remaining}">Rest (${eurShort(remaining)})</button>`:'');
+  if(jarKind==='trip'){
+    qs.innerHTML=[20,50,100,200].map(v=>`<button data-v="${v}">${v}&nbsp;€</button>`).join('');
+  }else{
+    const remaining=Math.max(0,jarTarget.price-jarTarget.saved);
+    const opts=[20,50,100,200].filter(v=>v<=remaining||remaining===0);
+    qs.innerHTML=opts.map(v=>`<button data-v="${v}">${v}&nbsp;€</button>`).join('')
+      +(remaining>0?`<button data-v="${remaining}">Rest (${eurShort(remaining)})</button>`:'');
+  }
   qs.querySelectorAll('button').forEach(b=>b.onclick=()=>{document.getElementById('jarAmount').value=b.dataset.v;});
 }
 function renderJarCats(){
   const field=document.getElementById('jarCatField');
-  if(jarKind!=='trip'||!jarTarget.items.length){field.classList.add('hidden');return;}
+  if(jarKind!=='trip'){field.classList.add('hidden');return;}
   field.classList.remove('hidden');
-  const box=document.getElementById('jarCats');box.innerHTML='';
-  const mk=(label,id,savedTxt)=>{
-    const b=document.createElement('button');
-    b.className='cat-chip'+(jarCatSel===id?' selected':'');
-    if(jarCatSel===id){b.style.borderColor='var(--ink)';b.style.background='var(--primary-soft)';}
-    b.innerHTML=esc(label)+(savedTxt?` <span style="color:var(--faint);font-weight:500">${savedTxt}</span>`:'');
-    b.onclick=()=>{jarCatSel=id;renderJarCats();renderJarQuickset();};
-    box.appendChild(b);
-  };
-  mk('General',null,jarTarget.saved>0?eurShort(jarTarget.saved):'');
-  jarTarget.items.forEach(i=>mk(i.name,i.id,(i.saved||0)>0?eurShort(i.saved)+' / '+eurShort(i.amount):eurShort(i.amount)));
+  const inp=document.getElementById('jarCatInput');inp.value='';
+  const quick=document.getElementById('jarCatQuick');
+  const sugg=[...new Set([...jarTarget.items.map(i=>i.name),'Food','Flights','Hotel','Transport','Activities','Shopping'])].slice(0,8);
+  quick.innerHTML=sugg.map(n=>`<button data-n="${esc(n)}">${esc(n)}</button>`).join('');
+  quick.querySelectorAll('button').forEach(b=>b.onclick=()=>{inp.value=b.dataset.n;});
 }
 function openJar(id,kind){
-  jarKind=kind||null;jarCatSel=null;
+  jarKind=kind||null;
   jarTarget=kind==='trip'?S.trips.find(t=>t.id===id):S.wishlist.find(w=>w.id===id);
   document.getElementById('jarTitle').textContent=`Jar — ${jarTarget.name}`;
   document.getElementById('jarAmount').value='';
@@ -1302,21 +1276,28 @@ function refreshJarViews(){
   if(!document.getElementById('tab-holidays').classList.contains('hidden'))renderTrips();
   renderSide();
 }
-function jarPocket(){
-  if(jarKind==='trip'&&jarCatSel)return jarTarget.items.find(i=>i.id===jarCatSel);
-  return jarTarget;
+function jarPocket(create){
+  if(jarKind!=='trip')return jarTarget;
+  const name=document.getElementById('jarCatInput').value.trim();
+  if(!name)return jarTarget; // general pot
+  let p=jarTarget.items.find(i=>i.name.toLowerCase()===name.toLowerCase());
+  if(!p&&create){p={id:uid(),name,saved:0};jarTarget.items.push(p);}
+  return p;
 }
 document.getElementById('jarAdd').onclick=()=>{
   const v=parseFloat(document.getElementById('jarAmount').value);
   if(!(v>0)){toast('Enter an amount');return;}
-  const p=jarPocket();p.saved=(p.saved||0)+v;
+  const p=jarPocket(true);p.saved=(p.saved||0)+v;
   saveState();closeModal('ovJar');refreshJarViews();
-  toast(`+${eur(v)} in the jar${jarKind==='trip'&&jarCatSel?' — '+jarPocket().name:''}`);
+  toast(`+${eur(v)} in the jar${jarKind==='trip'&&p!==jarTarget?' — '+p.name:''}`);
 };
 document.getElementById('jarRemove').onclick=()=>{
   const v=parseFloat(document.getElementById('jarAmount').value);
   if(!(v>0)){toast('Enter an amount');return;}
-  const p=jarPocket();p.saved=Math.max(0,(p.saved||0)-v);
+  const p=jarPocket(false);
+  if(!p){toast('Nothing saved in that category');return;}
+  p.saved=Math.max(0,(p.saved||0)-v);
+  if(jarKind==='trip'&&p!==jarTarget&&p.saved===0)jarTarget.items=jarTarget.items.filter(i=>i!==p);
   saveState();closeModal('ovJar');refreshJarViews();
   toast(`−${eur(v)} from the jar`);
 };
@@ -1353,32 +1334,30 @@ document.getElementById('purchaseConfirm').onclick=()=>{
 function renderTrips(){
   const grid=document.getElementById('tripGrid');
   if(!S.trips.length){
-    grid.innerHTML='<div class="card"><div class="empty">No trips yet. Add one and start planning — the jar keeps you honest.</div></div>';
+    grid.innerHTML='<div class="card"><div class="empty">No trips yet. Add one and start feeding its jar.</div></div>';
     return;
   }
   grid.innerHTML=S.trips.map(t=>{
-    const cost=tripTotal(t), tsaved=tripSaved(t);
-    const pct=cost>0?Math.min(1,tsaved/cost):0;
-    const jarColor=pct>=1?'#2E8B5F':pct>=.6?'#7A9A2E':pct>=.3?'#B8821A':'#6C55E0';
-    const lines=t.items.map(i=>
-      `<div class="save-line"><span class="sname">${esc(i.name)}</span>
-        <span style="display:flex;align-items:center;gap:8px">
-          <span class="samt" style="color:var(--text)">${(i.saved||0)>0?`<span style="color:var(--in)">${eurShort(i.saved)}</span> / `:''}${eur(i.amount)}</span>
-          <button class="tx-del" data-rmcost="${t.id}|${i.id}" aria-label="Remove" style="opacity:.6">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:14px;height:14px"><path d="M18 6L6 18M6 6l12 12"/></svg>
-          </button>
-        </span></div>`).join('');
+    const tsaved=tripSaved(t);
+    // soft fill: jar looks fuller as savings grow, no fixed target
+    const pct=tsaved>0?Math.min(1,1-1/(1+tsaved/900)):0;
+    const jarColor=tsaved>=2000?'#2E8B5F':tsaved>=1000?'#7A9A2E':tsaved>=300?'#B8821A':'#6C55E0';
+    const pockets=[
+      ...(t.saved>0?[{name:'General',saved:t.saved,gen:1}]:[]),
+      ...t.items
+    ];
+    const lines=pockets.map(p=>
+      `<div class="save-line"><span class="sname">${esc(p.name)}</span>
+        <span class="samt" style="color:var(--in)">${eur(p.saved)}</span></div>`).join('');
     return `<div class="wish-card">
       <div class="wish-row">
-        <div class="jar-wrap">${jarSVG(pct,jarColor)}<span class="jar-pct">${Math.round(pct*100)}%</span></div>
+        <div class="jar-wrap">${jarSVG(pct,jarColor)}<span class="jar-pct" style="font-size:11px">${tsaved>0?eurShort(tsaved):''}</span></div>
         <div class="wish-body">
           <div class="wish-name">${esc(t.name)}</div>
-          <div class="wish-price">Trip total: ${eur(cost)}</div>
-          <div class="wish-saved"><b>${eur(tsaved)}</b> saved for this${t.saved>0&&t.items.length?` <span style="color:var(--faint)">(incl. ${eurShort(t.saved)} general)</span>`:''}</div>
-          ${lines?`<div style="margin:6px 0 10px">${lines}</div>`:'<div class="after-sub" style="margin:4px 0 10px">No costs planned yet.</div>'}
+          <div class="wish-saved"><b>${eur(tsaved)}</b> saved for this trip</div>
+          ${lines?`<div style="margin:6px 0 10px">${lines}</div>`:'<div class="after-sub" style="margin:4px 0 10px">Jar is empty — feed it!</div>'}
           <div class="wish-actions">
             <button class="btn btn-primary" data-tjar="${t.id}">Feed the jar</button>
-            <button class="btn btn-ghost" data-tcost="${t.id}">Add cost</button>
             <button class="btn btn-danger" data-rmtrip="${t.id}">Remove</button>
           </div>
         </div>
@@ -1386,18 +1365,11 @@ function renderTrips(){
     </div>`;
   }).join('');
   grid.querySelectorAll('[data-tjar]').forEach(b=>b.onclick=()=>openJar(b.dataset.tjar,'trip'));
-  grid.querySelectorAll('[data-tcost]').forEach(b=>b.onclick=()=>openTripCost(b.dataset.tcost));
   grid.querySelectorAll('[data-rmtrip]').forEach(b=>b.onclick=()=>{
     const t=S.trips.find(x=>x.id===b.dataset.rmtrip);
     if(confirm(`Remove the trip "${t.name}"?`)){
       S.trips=S.trips.filter(x=>x.id!==t.id);saveState();renderTrips();renderSide();
     }
-  });
-  grid.querySelectorAll('[data-rmcost]').forEach(b=>b.onclick=()=>{
-    const [tid,iid]=b.dataset.rmcost.split('|');
-    const t=S.trips.find(x=>x.id===tid);
-    t.items=t.items.filter(i=>i.id!==iid);
-    saveState();renderTrips();renderSide();
   });
 }
 document.getElementById('btnAddTrip').onclick=()=>{
@@ -1410,27 +1382,6 @@ document.getElementById('tripSave').onclick=()=>{
   S.trips.push({id:uid(),name,saved:0,items:[],createdAt:todayISO()});
   saveState();closeModal('ovTrip');renderTrips();renderSide();toast('Trip added');
 };
-let tripCostTarget=null;
-function openTripCost(id){
-  tripCostTarget=S.trips.find(t=>t.id===id);
-  document.getElementById('tripCostTitle').textContent=`Add a cost — ${tripCostTarget.name}`;
-  document.getElementById('tripCostName').value='';
-  document.getElementById('tripCostAmount').value='';
-  const quick=document.getElementById('tripCostQuick');
-  quick.innerHTML=['Flights','Hotel','Food','Transport','Activities','Clothes','Shopping'].map(n=>`<button data-n="${n}">${n}</button>`).join('');
-  quick.querySelectorAll('button').forEach(b=>b.onclick=()=>{document.getElementById('tripCostName').value=b.dataset.n;document.getElementById('tripCostAmount').focus();});
-  openModal('ovTripCost');setTimeout(()=>document.getElementById('tripCostName').focus(),250);
-}
-document.getElementById('tripCostSave').onclick=()=>{
-  const name=document.getElementById('tripCostName').value.trim();
-  const amt=parseFloat(document.getElementById('tripCostAmount').value);
-  if(!name){toast('What is this cost for?');return;}
-  if(!(amt>0)){toast('Enter an amount');return;}
-  tripCostTarget.items.push({id:uid(),name,amount:amt});
-  saveState();closeModal('ovTripCost');renderTrips();renderSide();
-  toast(`${name}: ${eur(amt)} planned`);
-};
-
 // ============================================================
 // SETTINGS + CATEGORY MANAGER
 // ============================================================
@@ -1594,6 +1545,7 @@ function renderAll(){
   if(navigator.storage&&navigator.storage.persist){try{await navigator.storage.persist();}catch(e){}}
   const loaded=await loadState();
   if(loaded)S=Object.assign(defaultState(),loaded);
+    S.trips.forEach(t=>{t.items=(t.items||[]).filter(i=>(i.saved||0)>0).map(i=>({id:i.id,name:i.name,saved:i.saved||0}));});
   if(!S.setupDone)document.getElementById('setupNote').classList.remove('hidden');
   renderAll();
   // gentle backup reminder: more than 7 days old and there's data worth protecting
