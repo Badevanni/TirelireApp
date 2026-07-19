@@ -288,8 +288,8 @@ input:focus-visible,button:focus-visible,select:focus-visible{outline:2px solid 
   .bottomnav{position:fixed;left:0;right:0;bottom:0;z-index:40;display:flex;align-items:center;justify-content:space-around;
     background:rgba(248,244,236,.92);backdrop-filter:blur(14px);border-top:1px solid var(--line);
     padding:8px 10px calc(8px + env(safe-area-inset-bottom))}
-  .bn-item{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 18px;border-radius:14px;
-    color:var(--faint);font-size:11px;font-weight:600;min-width:76px}
+  .bn-item{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 8px;border-radius:14px;
+    color:var(--faint);font-size:11px;font-weight:600;min-width:62px}
   .bn-item svg{width:22px;height:22px}
   .bn-item.active{color:var(--ink)}
   .bn-add{width:58px;height:58px;border-radius:50%;background:var(--ink);color:var(--paper);
@@ -317,6 +317,7 @@ input:focus-visible,button:focus-visible,select:focus-visible{outline:2px solid 
   <div class="tabs" role="tablist">
     <button class="tab active" data-tab="main" role="tab">Money</button>
     <button class="tab" data-tab="wishlist" role="tab">Wishlist</button>
+    <button class="tab" data-tab="holidays" role="tab">Holidays</button>
   </div>
 
   <!-- ================= MAIN TAB ================= -->
@@ -404,6 +405,12 @@ input:focus-visible,button:focus-visible,select:focus-visible{outline:2px solid 
           <div class="after-sub">Your total as if the money in your jars was already gone.</div>
           <div id="savingsList"></div>
         </div>
+        <div class="card">
+          <div class="card-title">Trip simulation</div>
+          <div class="after-sub" style="margin-top:0">Tap a trip to see your total as if you paid it today. Just a simulation — nothing is deducted.</div>
+          <div class="cat-chips" id="simChips" style="margin-bottom:10px"></div>
+          <div id="simResult"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -413,6 +420,12 @@ input:focus-visible,button:focus-visible,select:focus-visible{outline:2px solid 
     <button class="btn btn-primary" style="width:100%;padding:14px;margin-bottom:16px" id="btnAddWish">Add a wish</button>
     <div class="wish-grid" id="wishGrid"></div>
     <div id="purchasedSection"></div>
+  </div>
+
+  <!-- ================= HOLIDAYS TAB ================= -->
+  <div id="tab-holidays" class="hidden">
+    <button class="btn btn-primary" style="width:100%;padding:14px;margin-bottom:16px" id="btnAddTrip">Add a trip</button>
+    <div class="wish-grid" id="tripGrid"></div>
   </div>
 
 </div>
@@ -486,6 +499,33 @@ input:focus-visible,button:focus-visible,select:focus-visible{outline:2px solid 
     <div class="modal-actions">
       <button class="btn btn-danger" id="jarRemove">Take out</button>
       <button class="btn btn-primary" id="jarAdd">Put in</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="ovTrip">
+  <div class="modal">
+    <div class="modal-head"><h3>Add a trip</h3><button class="close-x" data-close>×</button></div>
+    <div class="field"><label>Where to?</label><input type="text" id="tripName" placeholder="e.g. Tucson &amp; Los Angeles" maxlength="50"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" data-close>Cancel</button>
+      <button class="btn btn-primary" id="tripSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="ovTripCost">
+  <div class="modal">
+    <div class="modal-head"><h3 id="tripCostTitle">Add a cost</h3><button class="close-x" data-close>×</button></div>
+    <div class="field"><label>What for?</label><input type="text" id="tripCostName" placeholder="e.g. Flights, Food, Hotel…" maxlength="40">
+      <div class="quickset" id="tripCostQuick"></div>
+    </div>
+    <div class="field"><label>Amount</label>
+      <div class="amount-input"><input type="number" id="tripCostAmount" inputmode="decimal" placeholder="0" min="0" step="0.01"><span class="eur">€</span></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" data-close>Cancel</button>
+      <button class="btn btn-primary" id="tripCostSave">Add</button>
     </div>
   </div>
 </div>
@@ -566,6 +606,10 @@ input:focus-visible,button:focus-visible,select:focus-visible{outline:2px solid 
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>
     Wishlist
   </button>
+  <button class="bn-item" data-bn="holidays">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2L16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>
+    Holidays
+  </button>
 </nav>
 <div class="toast" id="toast"></div>
 
@@ -629,7 +673,8 @@ function defaultState(){
       {id:'wishcat',name:'Wishlist',color:'#8E5FCB',subs:[],pinned:false},
       {id:'other',name:'Other',color:'#8A6D4B',subs:[],pinned:false},
     ],
-    wishlist:[] // {id,name,price,saved,purchased,createdAt}
+    wishlist:[], // {id,name,price,saved,purchased,createdAt}
+    trips:[] // {id,name,saved,items:[{id,name,amount}],createdAt}
   };
 }
 let S=defaultState();
@@ -647,7 +692,9 @@ const DAYS_S=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 // ---------- Derived values ----------
 const cat=id=>S.categories.find(c=>c.id===id);
 const total=()=>S.startBalance+S.transactions.reduce((s,t)=>s+(t.type==='in'?t.amount:-t.amount),0);
-const savedTotal=()=>S.wishlist.filter(w=>!w.purchased).reduce((s,w)=>s+w.saved,0);
+const savedTotal=()=>S.wishlist.filter(w=>!w.purchased).reduce((s,w)=>s+w.saved,0)
+  +S.trips.reduce((s,t)=>s+t.saved,0);
+const tripTotal=t=>t.items.reduce((s,i)=>s+i.amount,0);
 const monthKey=d=>d.slice(0,7);
 function monthFlows(mk){
   let inn=0,out=0;
@@ -689,7 +736,9 @@ function switchTab(name){
   document.querySelectorAll('.bn-item').forEach(x=>x.classList.toggle('active',x.dataset.bn===name));
   document.getElementById('tab-main').classList.toggle('hidden',name!=='main');
   document.getElementById('tab-wishlist').classList.toggle('hidden',name!=='wishlist');
+  document.getElementById('tab-holidays').classList.toggle('hidden',name!=='holidays');
   if(name==='wishlist') renderWishlist();
+  if(name==='holidays') renderTrips();
   window.scrollTo({top:0});
 }
 document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>switchTab(b.dataset.tab)));
@@ -730,10 +779,35 @@ function renderSide(){
   const st=savedTotal();
   document.getElementById('afterTotal').textContent=eur(total()-st);
   const list=document.getElementById('savingsList');
-  const items=S.wishlist.filter(w=>!w.purchased&&w.saved>0);
-  if(!items.length){list.innerHTML='<div class="empty">Nothing set aside yet. Feed a jar in the wishlist.</div>';return;}
-  list.innerHTML=items.map(w=>`<div class="save-line"><span class="sname">${esc(w.name)}</span><span class="samt">−&nbsp;${eur(w.saved)}</span></div>`).join('')
+  const items=[
+    ...S.wishlist.filter(w=>!w.purchased&&w.saved>0).map(w=>({name:w.name,saved:w.saved})),
+    ...S.trips.filter(t=>t.saved>0).map(t=>({name:t.name+' (trip)',saved:t.saved}))
+  ];
+  if(!items.length){list.innerHTML='<div class="empty">Nothing set aside yet. Feed a jar in the wishlist or a trip.</div>';}
+  else list.innerHTML=items.map(w=>`<div class="save-line"><span class="sname">${esc(w.name)}</span><span class="samt">−&nbsp;${eur(w.saved)}</span></div>`).join('')
     +`<div class="save-total-line"><span>Total set aside</span><span>−&nbsp;${eur(st)}</span></div>`;
+  renderSim();
+}
+// ---- trip simulation ----
+let simTripId=null;
+function renderSim(){
+  const chips=document.getElementById('simChips'),res=document.getElementById('simResult');
+  if(!S.trips.length){chips.innerHTML='';res.innerHTML='<div class="empty">No trips yet — add one in the Holidays tab.</div>';return;}
+  if(simTripId&&!S.trips.find(t=>t.id===simTripId))simTripId=null;
+  chips.innerHTML='';
+  S.trips.forEach(t=>{
+    const b=document.createElement('button');
+    b.className='cat-chip'+(simTripId===t.id?' selected':'');
+    if(simTripId===t.id){b.style.borderColor='var(--ink)';b.style.background='var(--primary-soft)';}
+    b.textContent=t.name;
+    b.onclick=()=>{simTripId=simTripId===t.id?null:t.id;renderSim();};
+    chips.appendChild(b);
+  });
+  if(!simTripId){res.innerHTML='';return;}
+  const t=S.trips.find(x=>x.id===simTripId), cost=tripTotal(t);
+  const after=total()-cost;
+  res.innerHTML=`<div class="after-total" style="color:${after<S.minKeep?'var(--out)':'var(--text)'}">${eur(after)}</div>
+    <div class="after-sub">${eur(total())} − ${eur(cost)} (${esc(t.name)})${t.saved>0?` · its jar already holds ${eur(Math.min(t.saved,cost))} of it`:''}</div>`;
 }
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
@@ -1176,13 +1250,14 @@ cardPhotoInput.addEventListener('change',async e=>{
   const w=S.wishlist.find(x=>x.id===photoTargetId);
   if(w){w.photo=data;saveState();renderWishlist();toast('Photo added');}
 });
-// jar
+// jar (shared by wishlist items and trips)
 let jarTarget=null;
-function openJar(id){
-  jarTarget=S.wishlist.find(w=>w.id===id);
+function openJar(id,kind){
+  jarTarget=kind==='trip'?S.trips.find(t=>t.id===id):S.wishlist.find(w=>w.id===id);
   document.getElementById('jarTitle').textContent=`Jar — ${jarTarget.name}`;
   document.getElementById('jarAmount').value='';
-  const remaining=Math.max(0,jarTarget.price-jarTarget.saved);
+  const target=kind==='trip'?tripTotal(jarTarget):jarTarget.price;
+  const remaining=Math.max(0,target-jarTarget.saved);
   const qs=document.getElementById('jarQuickset');
   const opts=[20,50,100,200].filter(v=>v<=remaining||remaining===0);
   qs.innerHTML=opts.map(v=>`<button data-v="${v}">${v}&nbsp;€</button>`).join('')
@@ -1190,16 +1265,21 @@ function openJar(id){
   qs.querySelectorAll('button').forEach(b=>b.onclick=()=>{document.getElementById('jarAmount').value=b.dataset.v;});
   openModal('ovJar');
 }
+function refreshJarViews(){
+  if(!document.getElementById('tab-wishlist').classList.contains('hidden'))renderWishlist();
+  if(!document.getElementById('tab-holidays').classList.contains('hidden'))renderTrips();
+  renderSide();
+}
 document.getElementById('jarAdd').onclick=()=>{
   const v=parseFloat(document.getElementById('jarAmount').value);
   if(!(v>0)){toast('Enter an amount');return;}
-  jarTarget.saved+=v;saveState();closeModal('ovJar');renderWishlist();renderSide();
+  jarTarget.saved+=v;saveState();closeModal('ovJar');refreshJarViews();
   toast(`+${eur(v)} in the jar`);
 };
 document.getElementById('jarRemove').onclick=()=>{
   const v=parseFloat(document.getElementById('jarAmount').value);
   if(!(v>0)){toast('Enter an amount');return;}
-  jarTarget.saved=Math.max(0,jarTarget.saved-v);saveState();closeModal('ovJar');renderWishlist();renderSide();
+  jarTarget.saved=Math.max(0,jarTarget.saved-v);saveState();closeModal('ovJar');refreshJarViews();
   toast(`−${eur(v)} from the jar`);
 };
 // purchase
@@ -1227,6 +1307,90 @@ document.getElementById('purchaseConfirm').onclick=()=>{
   purchaseTarget.purchased=true;purchaseTarget.saved=0;
   saveState();closeModal('ovPurchase');renderAll();renderWishlist();
   toast(`${purchaseTarget.name} — purchased!`);
+};
+
+// ============================================================
+// HOLIDAYS / TRIPS
+// ============================================================
+function renderTrips(){
+  const grid=document.getElementById('tripGrid');
+  if(!S.trips.length){
+    grid.innerHTML='<div class="card"><div class="empty">No trips yet. Add one and start planning — the jar keeps you honest.</div></div>';
+    return;
+  }
+  grid.innerHTML=S.trips.map(t=>{
+    const cost=tripTotal(t);
+    const pct=cost>0?Math.min(1,t.saved/cost):0;
+    const jarColor=pct>=1?'#2E8B5F':pct>=.6?'#7A9A2E':pct>=.3?'#B8821A':'#6C55E0';
+    const lines=t.items.map(i=>
+      `<div class="save-line"><span class="sname">${esc(i.name)}</span>
+        <span style="display:flex;align-items:center;gap:8px">
+          <span class="samt" style="color:var(--text)">${eur(i.amount)}</span>
+          <button class="tx-del" data-rmcost="${t.id}|${i.id}" aria-label="Remove" style="opacity:.6">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:14px;height:14px"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </span></div>`).join('');
+    return `<div class="wish-card">
+      <div class="wish-row">
+        <div class="jar-wrap">${jarSVG(pct,jarColor)}<span class="jar-pct">${Math.round(pct*100)}%</span></div>
+        <div class="wish-body">
+          <div class="wish-name">${esc(t.name)}</div>
+          <div class="wish-price">Trip total: ${eur(cost)}</div>
+          <div class="wish-saved"><b>${eur(t.saved)}</b> saved for this</div>
+          ${lines?`<div style="margin:6px 0 10px">${lines}</div>`:'<div class="after-sub" style="margin:4px 0 10px">No costs planned yet.</div>'}
+          <div class="wish-actions">
+            <button class="btn btn-primary" data-tjar="${t.id}">Feed the jar</button>
+            <button class="btn btn-ghost" data-tcost="${t.id}">Add cost</button>
+            <button class="btn btn-danger" data-rmtrip="${t.id}">Remove</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  grid.querySelectorAll('[data-tjar]').forEach(b=>b.onclick=()=>openJar(b.dataset.tjar,'trip'));
+  grid.querySelectorAll('[data-tcost]').forEach(b=>b.onclick=()=>openTripCost(b.dataset.tcost));
+  grid.querySelectorAll('[data-rmtrip]').forEach(b=>b.onclick=()=>{
+    const t=S.trips.find(x=>x.id===b.dataset.rmtrip);
+    if(confirm(`Remove the trip "${t.name}"?`)){
+      S.trips=S.trips.filter(x=>x.id!==t.id);saveState();renderTrips();renderSide();
+    }
+  });
+  grid.querySelectorAll('[data-rmcost]').forEach(b=>b.onclick=()=>{
+    const [tid,iid]=b.dataset.rmcost.split('|');
+    const t=S.trips.find(x=>x.id===tid);
+    t.items=t.items.filter(i=>i.id!==iid);
+    saveState();renderTrips();renderSide();
+  });
+}
+document.getElementById('btnAddTrip').onclick=()=>{
+  document.getElementById('tripName').value='';
+  openModal('ovTrip');setTimeout(()=>document.getElementById('tripName').focus(),250);
+};
+document.getElementById('tripSave').onclick=()=>{
+  const name=document.getElementById('tripName').value.trim();
+  if(!name){toast('Give the trip a name');return;}
+  S.trips.push({id:uid(),name,saved:0,items:[],createdAt:todayISO()});
+  saveState();closeModal('ovTrip');renderTrips();renderSide();toast('Trip added');
+};
+let tripCostTarget=null;
+function openTripCost(id){
+  tripCostTarget=S.trips.find(t=>t.id===id);
+  document.getElementById('tripCostTitle').textContent=`Add a cost — ${tripCostTarget.name}`;
+  document.getElementById('tripCostName').value='';
+  document.getElementById('tripCostAmount').value='';
+  const quick=document.getElementById('tripCostQuick');
+  quick.innerHTML=['Flights','Hotel','Food','Transport','Activities','Clothes','Shopping'].map(n=>`<button data-n="${n}">${n}</button>`).join('');
+  quick.querySelectorAll('button').forEach(b=>b.onclick=()=>{document.getElementById('tripCostName').value=b.dataset.n;document.getElementById('tripCostAmount').focus();});
+  openModal('ovTripCost');setTimeout(()=>document.getElementById('tripCostName').focus(),250);
+}
+document.getElementById('tripCostSave').onclick=()=>{
+  const name=document.getElementById('tripCostName').value.trim();
+  const amt=parseFloat(document.getElementById('tripCostAmount').value);
+  if(!name){toast('What is this cost for?');return;}
+  if(!(amt>0)){toast('Enter an amount');return;}
+  tripCostTarget.items.push({id:uid(),name,amount:amt});
+  saveState();closeModal('ovTripCost');renderTrips();renderSide();
+  toast(`${name}: ${eur(amt)} planned`);
 };
 
 // ============================================================
